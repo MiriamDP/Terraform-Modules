@@ -9,6 +9,10 @@ resource "aws_vpc" "main" {
   cidr_block           = var.vpc_address_range
   enable_dns_hostnames = true
 
+  tags = {
+    Name = "${var.prefix}-vpc"
+  }
+
 }
 
 resource "aws_internet_gateway" "main" {
