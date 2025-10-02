@@ -167,6 +167,7 @@ resource "aws_cloudwatch_metric_alarm" "cpu_low" {
   }
 }
 
+# Load balancer resources
 resource "aws_lb" "front_end" {
   name               = "${var.prefix}-nlb"
   internal           = false
