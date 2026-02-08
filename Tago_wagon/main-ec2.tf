@@ -7,7 +7,7 @@ data "aws_ssm_parameter" "amzn2_linux" {
 # Security Groups
 resource "aws_security_group" "nlb_sg" {
   name_prefix = "${var.prefix}-nlb-sg-"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = module.vpc.default_vpc_id
 
   ingress {
     description = "Allow HTTP traffic from anywhere"
@@ -33,7 +33,7 @@ resource "aws_security_group" "nlb_sg" {
 
 resource "aws_security_group" "ec2_sg" {
   name_prefix = "${var.prefix}-ec2-sg-"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = module.vpc.default_vpc_id
 
   ingress {
     description     = "Allow HTTP traffic from NLB"
@@ -78,7 +78,7 @@ resource "aws_launch_template" "front_end" {
 }
 
 resource "aws_autoscaling_group" "front_end" {
-  vpc_zone_identifier = [for subnet in aws_subnet.public_subnets : subnet.id]
+  vpc_zone_identifier = module.vpc.public_subnets
   desired_capacity    = var.autoscale_group_size
   max_size            = var.autoscale_group_min_max.max
   min_size            = var.autoscale_group_min_max.min
@@ -197,7 +197,7 @@ resource "aws_lb_target_group" "front_end" {
   name     = "${var.prefix}-lb-tg"
   port     = var.app_port
   protocol = "TCP"
-  vpc_id   = aws_vpc.main.id
+  vpc_id   = module.vpc.default_vpc_id
 }
 
 # Create a new ALB Target Group attachment
