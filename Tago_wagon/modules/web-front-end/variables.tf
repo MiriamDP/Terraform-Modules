@@ -30,6 +30,13 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
+variable "instance_tags" {
+  type = map(string)
+  description = "Aditional tags for the lainch template instaces"
+  default = {  } //para hacerlo opcional
+
+}
+
 variable "launch_template_ami" {
     type = string
     description = "AMID ID to use for the laucnh template"
