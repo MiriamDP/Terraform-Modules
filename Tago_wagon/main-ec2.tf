@@ -4,103 +4,19 @@ data "aws_ssm_parameter" "amzn2_linux" {
   name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
 }
 
-# Security Groups
-resource "aws_security_group" "nlb_sg" {
-  name_prefix = "${var.prefix}-nlb-sg-"
-  vpc_id      = module.vpc.default_vpc_id
-
-  ingress {
-    description = "Allow HTTP traffic from anywhere"
-    from_port   = var.app_port
-    to_port     = var.app_port
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    description = "Allow all outbound traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name        = "${var.prefix}-${var.environment}-nlb-sg"
-    Environment = var.environment
-  }
-}
-
-resource "aws_security_group" "ec2_sg" {
-  name_prefix = "${var.prefix}-ec2-sg-"
-  vpc_id      = module.vpc.default_vpc_id
-
-  ingress {
-    description     = "Allow HTTP traffic from NLB"
-    from_port       = var.app_port
-    to_port         = var.app_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.nlb_sg.id]
-  }
-
-  egress {
-    description = "Allow all outbound traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name        = "${var.prefix}-${var.environment}-ec2-sg"
-    Environment = var.environment
-  }
-}
-
-## Autoscale group
-resource "aws_launch_template" "front_end" {
-  name_prefix   = "${var.prefix}-web-"
-  image_id      = data.aws_ssm_parameter.amzn2_linux.value
+module "web_front_end" {
+  source = "./modules/web-front-end"
+  //inputs del modulo
+  app_port = var.app_port
+  autoscaling_group_size = var.autoscale_group_size
+  autoscaling_group_min_max = var.autoscale_group_min_max
+  environment = var.environment
   instance_type = var.instance_type
-  user_data = base64encode(templatefile("./templates/startup_script.tpl", {
-    environment = var.environment
-  }))
-
-  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
-
-  tag_specifications {
-    resource_type = "instance"
-    tags = {
-      Name        = "${var.prefix}-${var.environment}-ec2-instance"
-      Environment = var.environment
-    }
-  }
-}
-
-resource "aws_autoscaling_group" "front_end" {
-  vpc_zone_identifier = module.vpc.public_subnets
-  desired_capacity    = var.autoscale_group_size
-  max_size            = var.autoscale_group_min_max.max
-  min_size            = var.autoscale_group_min_max.min
-
-  launch_template {
-    id      = aws_launch_template.front_end.id
-    version = "$Latest"
-  }
-
-  health_check_type = "ELB"
-
-  tag {
-    key                 = "Name"
-    value               = "${var.prefix}-${var.environment}-asg"
-    propagate_at_launch = false
-  }
-
-  tag {
-    key                 = "Environment"
-    value               = var.environment
-    propagate_at_launch = false
-  }
+  launch_template_ami = data.aws_ssm_parameter.amzn2_linux.value
+  prefix = var.prefix
+  publi_subnets_ids = module.vpc.public_subnets
+  vpc_id = module.vpc.vpc_id
+  user_data_contents = base64encode(templatefile("./templates/startup_script.tpl",{environment=var.environment}))
 }
 
 # Autoscaling Policies
@@ -109,7 +25,7 @@ resource "aws_autoscaling_policy" "scale_up" {
   scaling_adjustment     = 1
   adjustment_type        = "ChangeInCapacity"
   cooldown               = 300
-  autoscaling_group_name = aws_autoscaling_group.front_end.name
+  autoscaling_group_name = module.web_front_end.autoscaling_group_name
   policy_type            = "SimpleScaling"
 }
 
@@ -118,7 +34,7 @@ resource "aws_autoscaling_policy" "scale_down" {
   scaling_adjustment     = -1
   adjustment_type        = "ChangeInCapacity"
   cooldown               = 300
-  autoscaling_group_name = aws_autoscaling_group.front_end.name
+  autoscaling_group_name = module.web_front_end.autoscaling_group_name
   policy_type            = "SimpleScaling"
 }
 

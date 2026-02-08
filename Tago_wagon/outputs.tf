@@ -1,3 +1,3 @@
 output "public_nlb_dns" {
-  value = aws_lb.front_end.dns_name
+  value = module.web_front_end.lb_public_dns
 }
